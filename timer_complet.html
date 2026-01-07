@@ -74,7 +74,7 @@ margin: 40px; }
   <div id="progress">Progression : 0%</div>
   
 </div>
-<div id="timer">Temps : 0.0s</div>
+<div id="timer">Temps : 0s</div>
 <canvas id="canvas"></canvas>
 
 <script>
@@ -102,7 +102,7 @@ const state = {
 };
 
 /* ===================== DOM ===================== */
-
+const son = new Audio('notif.mp3');
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const timerDiv = document.getElementById("timer");
@@ -113,7 +113,7 @@ const progressDiv = document.getElementById("progress");
 const startBtn = document.getElementById("start");
 const resetBtn = document.getElementById("reset");
 const timerInput = document.getElementById("timerDuration");
-const animInput = 3600;
+const animInput = 10;
 
 /* ===================== STORAGE ===================== */
 
@@ -244,6 +244,7 @@ function loop(t) {
 
   if (state.revealed >= state.blocks.length) {
     state.running = false;
+    son.play();
     saveDept(departments[state.deptIndex].num);
     setTimeout(completeDepartment, 1200);
     return;
@@ -252,6 +253,7 @@ function loop(t) {
   if (timeLeft <= 0) {
     state.running = false;
     state.totalTime += elapsed;
+    son.play();
     saveDept(departments[state.deptIndex].num);
     return;
   }
