@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Révélation par bruit avec timer</title>
+  <style>
+    *{
+      font-size: 50px;
+      padding: 0;
+      margin: 0;
+    }
+    body {
+      background: #111;
+      color: white;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      gap: 12px;
+      
+    }
+
+
+    canvas {
+      margin-top: 100px;
+      background: #111;
+      
+    }
+
+    .controls {
+      display:flex;
+      gap: 50px;
+      align-items: center;
+      margin-bottom: 50px;
+    }
+
+    button {
+      padding: 8px 16px;  
+      cursor: pointer;
+    }
+
+    input {
+      padding: 8px;  
+      font-size: 40px;
+      text-align: right;
+    }
+
+    #timer {
+      font-weight: bold;
+      font-size: 60px;
+    }
+  </style>
+</head>
+<body>
+
+
+
+<div class="controls">
+  <label>Durée timer :</label>
+  <input type="number" id="timerDuration" value="1800" min="1" max="3600" step="1">
+  <button id="start">Démarrer</button>
+</div>
+<div id="timer">Temps : 0s</div>
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const timerDiv = document.getElementById("timer");
+const startBtn = document.getElementById("start");
+const timerDurationInput = document.getElementById("timerDuration");
+const animDurationInput = document.getElementById("animDuration");
+
+const img = new Image();
+img.src = "morbihan.png";
+
+const blockSize = 2;
+let blocks = [];
+let revealed = 0;
+let startTime = null;
+let running = false;
+let timerDuration = 1800;
+let animDuration = 3600;
+
+img.onload = () => {
+  canvas.width = img.width;
+  canvas.height = img.height;
+
+  for (let y = 0; y < canvas.height; y += blockSize) {
+    for (let x = 0; x < canvas.width; x += blockSize) {
+      blocks.push({ x, y });
+    }
+  }
+
+  blocks.sort(() => Math.random() - 0.5);
+};
+
+startBtn.onclick = () => {
+  timerDuration = parseFloat(timerDurationInput.value) || 5;
+  animDuration = 3600;
+  
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  revealed = 0;
+  startTime = null;
+  running = true;
+
+  requestAnimationFrame(loop);
+};
+
+function loop(timestamp) {
+  if (!running) return;
+
+  if (!startTime) startTime = timestamp;
+
+  const elapsed = (timestamp - startTime) / 1000;
+  const timeLeft = Math.max(0, timerDuration - elapsed);
+  
+  timerDiv.textContent = `Temps : ${timeLeft.toFixed(0)}s`;
+
+  if (timeLeft <= 0) {
+    running = false;
+    timerDiv.textContent = `Temps : 0.0s`;
+    return;
+  }
+
+  const progress = elapsed / animDuration;
+  const targetCount = Math.floor(progress * blocks.length);
+
+  while (revealed < targetCount && revealed < blocks.length) {
+    const b = blocks[revealed];
+    ctx.drawImage(
+      img,
+      b.x, b.y, blockSize, blockSize,
+      b.x, b.y, blockSize, blockSize
+    );
+    revealed++;
+  }
+
+  requestAnimationFrame(loop);
+}
+</script>
+
+</body>
+</html>

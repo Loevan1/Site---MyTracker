@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Révélation par bruit avec timer</title>
+  <style>
+    body {
+      background: #111;
+      color: white;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      gap: 12px;
+    }
+
+    canvas {
+      background: #222;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    button {
+      padding: 8px 16px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    input {
+      padding: 8px;
+      font-size: 16px;
+      width: 80px;
+    }
+
+    #timer {
+      font-size: 24px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<div id="timer">Temps : 5.0s</div>
+
+<div class="controls">
+  <label>Durée timer (s) :</label>
+  <input type="number" id="timerDuration" value="5" min="1" max="60" step="1">
+  <button id="start">Démarrer</button>
+  
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const timerDiv = document.getElementById("timer");
+const startBtn = document.getElementById("start");
+
+const timerDurationInput = document.getElementById("timerDuration");
+
+
+const img = new Image();
+img.src = "bretagne.png";
+
+const blockSize = 1;
+let blocks = [];
+let revealed = 0;
+let startTime = null;
+let running = false;
+let timerDuration = 5;
+let animDuration = 5;
+let totalElapsedTime = 0; // Temps total accumulé
+
+// Charger la progression sauvegardée
+function loadProgress() {
+  const saved = localStorage.getItem('revealProgress');
+  if (saved) {
+    const data = JSON.parse(saved);
+    revealed = data.revealed || 0;
+    totalElapsedTime = data.totalElapsedTime || 0;
+    return true;
+  }
+  return false;
+}
+
+// Sauvegarder la progression
+function saveProgress() {
+  localStorage.setItem('revealProgress', JSON.stringify({
+    revealed: revealed,
+    totalBlocks: blocks.length,
+    totalElapsedTime: totalElapsedTime
+  }));
+}
+
+// Réinitialiser la progression
+function resetProgress() {
+  revealed = 0;
+  totalElapsedTime = 0;
+  localStorage.removeItem('revealProgress');
+}
+
+img.onload = () => {
+  canvas.width = img.width;
+  canvas.height = img.height;
+
+  for (let y = 0; y < canvas.height; y += blockSize) {
+    for (let x = 0; x < canvas.width; x += blockSize) {
+      blocks.push({ x, y });
+    }
+  }
+
+  blocks.sort(() => Math.random() - 0.5);
+  
+  // Charger et redessiner la progression existante
+  if (loadProgress()) {
+    for (let i = 0; i < revealed && i < blocks.length; i++) {
+      const b = blocks[i];
+      ctx.drawImage(
+        img,
+        b.x, b.y, blockSize, blockSize,
+        b.x, b.y, blockSize, blockSize
+      );
+    }
+    const percent = ((revealed / blocks.length) * 100).toFixed(1);
+    timerDiv.textContent = `Progression : ${percent}%`;
+  }
+};
+
+startBtn.onclick = () => {
+  timerDuration = parseFloat(timerDurationInput.value) || 5;
+  animDuration = 60;
+  
+  // Ne pas effacer le canvas, juste continuer
+  startTime = null;
+  running = true;
+
+  requestAnimationFrame(loop);
+};
+
+
+function loop(timestamp) {
+  if (!running) return;
+
+  if (!startTime) startTime = timestamp;
+
+  const currentElapsed = (timestamp - startTime) / 1000;
+  const timeLeft = Math.max(0, timerDuration - currentElapsed);
+  const percent = ((revealed / blocks.length) * 100).toFixed(1);
+  timerDiv.textContent = `Temps : ${timeLeft.toFixed(1)}s | Progression : ${percent}%`;
+
+  if (timeLeft <= 0 || revealed >= blocks.length) {
+    running = false;
+    totalElapsedTime += currentElapsed; // Accumuler le temps passé
+    saveProgress();
+    if (revealed >= blocks.length) {
+      timerDiv.textContent = `Terminé ! 100%`;
+      resetProgress();
+    } else {
+      timerDiv.textContent = `Temps écoulé | Progression : ${percent}%`;
+    }
+    return;
+  }
+
+  // Calculer la progression totale en incluant le temps accumulé précédemment
+  const totalTime = totalElapsedTime + currentElapsed;
+  const totalProgress = totalTime / animDuration;
+  const totalTargetCount = Math.floor(totalProgress * blocks.length);
+
+  // Révéler les blocs manquants
+  while (revealed < totalTargetCount && revealed < blocks.length) {
+    const b = blocks[revealed];
+    ctx.drawImage(
+      img,
+      b.x, b.y, blockSize, blockSize,
+      b.x, b.y, blockSize, blockSize
+    );
+    revealed++;
+  }
+
+  requestAnimationFrame(loop);
+}
+</script>
+
+</body>
+</html>

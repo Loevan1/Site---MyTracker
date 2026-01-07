@@ -1,0 +1,15 @@
+.slider-container {
+    width: 300px;
+    margin: 20px;
+  }
+
+  input[type=range] {
+    width: 100%;
+  }
+
+  .labels {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    margin-top: 5px;
+  }
