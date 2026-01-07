@@ -60,7 +60,7 @@ margin: 40px; }
 
 <div id="temps">
 <label>Timer : </label>
-  <input id="timerDuration" type="number" value="5" min="1" step="1">
+  <input id="timerDuration" type="number" value="1800" min="1" step="1">
 </div>
 <div class="controls">
   
@@ -84,7 +84,7 @@ const departments = [
   { num:"01", name:"Ain" }, { num:"02", name:"Aisne" },
   { num:"03", name:"Allier" }, { num:"04", name:"Alpes-de-Haute-Provence" },
   { num:"05", name:"Hautes-Alpes" }, { num:"06", name:"Alpes-Maritimes" },
-  // raccourci volontaire ici, garde ta liste complète
+  
 ];
 
 const BLOCK_SIZE = 1;
@@ -113,7 +113,7 @@ const progressDiv = document.getElementById("progress");
 const startBtn = document.getElementById("start");
 const resetBtn = document.getElementById("reset");
 const timerInput = document.getElementById("timerDuration");
-const animInput = 10;
+const animInput = 3600;
 
 /* ===================== STORAGE ===================== */
 
