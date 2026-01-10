@@ -1,191 +1,293 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Révélation par bruit avec timer</title>
-  <style>
-    body {
-      background: #111;
-      color: white;
-      font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      gap: 12px;
-    }
+<meta charset="UTF-8">
+<title>Révélation des départements</title>
 
-    canvas {
-      background: #222;
-    }
+<style>
+body {
+  background:#111;
+  color:white;
+  font-family:sans-serif;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:12px;
+  padding:20px;
+  font-size: 50px;
+  height: 95svh;
+}
 
-    .controls {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
+canvas {
+  background:#111;
+  width: 900px;
+  border: 2px solid #222;
+  margin-bottom: 10px;
+}
 
-    button {
-      padding: 8px 16px;
-      font-size: 16px;
-      cursor: pointer;
-    }
+.controls {
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  justify-content:center;
+}
 
-    input {
-      padding: 8px;
-      font-size: 16px;
-      width: 80px;
-    }
+button {
+  padding:8px 16px;
+  margin: 40px;
+  font-size: 40px;
+}
+#timerDuration{
+  padding: 2px; 
+  width: 150px; 
+  font-size: 35px;
+  text-align: center;
+}
+#timer { font-size:60px;
+font-weight: bold;
+margin: 40px; }
 
-    #timer {
-      font-size: 24px;
-      font-weight: bold;
-    }
-  </style>
+.stats { display:flex; gap:20px; font-size: 40px; }
+
+#temps{
+  display: flex;
+  gap: 20px;
+  font-size: 40px;
+}
+</style>
 </head>
+
 <body>
 
-<div id="timer">Temps : 5.0s</div>
-
+<div id="temps">
+<label>Timer : </label>
+  <input id="timerDuration" type="number" value="1800" min="1" step="1">
+</div>
 <div class="controls">
-  <label>Durée timer (s) :</label>
-  <input type="number" id="timerDuration" value="5" min="1" max="60" step="1">
-  <button id="start">Démarrer</button>
   
+  
+  <button id="start">Démarrer</button>
+  <button id="reset">Reset total</button>
 </div>
 
+<div class="stats">
+  <div id="completedCount">Complétés : 0/101 </div>
+  <div id="progress">Progression : 0%</div>
+  
+</div>
+<div id="timer">Temps : 0s</div>
 <canvas id="canvas"></canvas>
 
 <script>
+/* ===================== DONNÉES ===================== */
+
+const departments = [
+  { num:"01", name:"Ain" }, { num:"02", name:"Aisne" },
+  { num:"03", name:"Allier" }, { num:"04", name:"Alpes-de-Haute-Provence" },
+  { num:"05", name:"Hautes-Alpes" }, { num:"06", name:"Alpes-Maritimes" },
+  
+];
+
+const BLOCK_SIZE = 1;
+
+/* ===================== ÉTAT GLOBAL ===================== */
+
+const state = {
+  deptIndex: 0,
+  revealed: 0,
+  totalTime: 0,
+  running: false,
+  startTime: null,
+  blocks: [],
+  img: null,
+  intervalId: null
+};
+
+/* ===================== DOM ===================== */
+const son = new Audio('notif.mp3');
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const timerDiv = document.getElementById("timer");
+
+const completedDiv = document.getElementById("completedCount");
+const progressDiv = document.getElementById("progress");
+
 const startBtn = document.getElementById("start");
+const resetBtn = document.getElementById("reset");
+const timerInput = document.getElementById("timerDuration");
+const animInput = 3600;
 
-const timerDurationInput = document.getElementById("timerDuration");
+/* ===================== STORAGE ===================== */
 
-
-const img = new Image();
-img.src = "bretagne.png";
-
-const blockSize = 1;
-let blocks = [];
-let revealed = 0;
-let startTime = null;
-let running = false;
-let timerDuration = 5;
-let animDuration = 5;
-let totalElapsedTime = 0; // Temps total accumulé
-
-// Charger la progression sauvegardée
-function loadProgress() {
-  const saved = localStorage.getItem('revealProgress');
-  if (saved) {
-    const data = JSON.parse(saved);
-    revealed = data.revealed || 0;
-    totalElapsedTime = data.totalElapsedTime || 0;
-    return true;
-  }
-  return false;
+function loadGlobal() {
+  const stored = localStorage.getItem("global");
+  return stored ? JSON.parse(stored) : {
+    deptIndex: 0,
+    completed: []
+  };
 }
 
-// Sauvegarder la progression
-function saveProgress() {
-  localStorage.setItem('revealProgress', JSON.stringify({
-    revealed: revealed,
-    totalBlocks: blocks.length,
-    totalElapsedTime: totalElapsedTime
+function saveGlobal(data) {
+  localStorage.setItem("global", JSON.stringify(data));
+}
+
+function loadDept(num) {
+  const stored = localStorage.getItem("dept_" + num);
+  return stored ? JSON.parse(stored) : null;
+}
+
+function saveDept(num) {
+  localStorage.setItem("dept_" + num, JSON.stringify({
+    revealed: state.revealed,
+    totalTime: state.totalTime
   }));
 }
 
-// Réinitialiser la progression
-function resetProgress() {
-  revealed = 0;
-  totalElapsedTime = 0;
-  localStorage.removeItem('revealProgress');
+/* ===================== LOGIQUE ===================== */
+
+function loadDepartment() {
+  const global = loadGlobal();
+  state.deptIndex = global.deptIndex;
+
+  const dept = departments[state.deptIndex];
+  
+
+  state.revealed = 0;
+  state.totalTime = 0;
+  state.blocks = [];
+  state.running = false;
+
+  state.img = new Image();
+  state.img.src = `departements/dept_${dept.num}.png`;
+
+  
+
+  state.img.onload = () => {
+    canvas.width = state.img.width;
+    canvas.height = state.img.height;
+
+    for (let y=0;y<canvas.height;y+=BLOCK_SIZE) {
+      for (let x=0;x<canvas.width;x+=BLOCK_SIZE) {
+        state.blocks.push({x,y});
+      }
+    }
+
+    state.blocks.sort(()=>Math.random()-0.5);
+
+    const saved = loadDept(dept.num);
+    if (saved) {
+      state.revealed = Math.min(saved.revealed, state.blocks.length);
+      state.totalTime = saved.totalTime;
+      redraw();
+    }
+
+    updateUI();
+  };
 }
 
-img.onload = () => {
-  canvas.width = img.width;
-  canvas.height = img.height;
-
-  for (let y = 0; y < canvas.height; y += blockSize) {
-    for (let x = 0; x < canvas.width; x += blockSize) {
-      blocks.push({ x, y });
-    }
+function redraw() {
+  for (let i=0;i<state.revealed;i++) {
+    const b = state.blocks[i];
+    ctx.drawImage(state.img, b.x,b.y,1,1, b.x,b.y,1,1);
   }
+}
 
-  blocks.sort(() => Math.random() - 0.5);
-  
-  // Charger et redessiner la progression existante
-  if (loadProgress()) {
-    for (let i = 0; i < revealed && i < blocks.length; i++) {
-      const b = blocks[i];
-      ctx.drawImage(
-        img,
-        b.x, b.y, blockSize, blockSize,
-        b.x, b.y, blockSize, blockSize
-      );
-    }
-    const percent = ((revealed / blocks.length) * 100).toFixed(1);
-    timerDiv.textContent = `Progression : ${percent}%`;
-  }
-};
+function updateUI() {
+  const global = loadGlobal();
+  completedDiv.textContent =
+    `Complétés : ${global.completed.length}/101`;
 
-startBtn.onclick = () => {
-  timerDuration = parseFloat(timerDurationInput.value) || 5;
-  animDuration = 60;
-  
-  // Ne pas effacer le canvas, juste continuer
-  startTime = null;
-  running = true;
+  const pct = ((state.revealed/state.blocks.length)*100||0).toFixed(1);
+  progressDiv.textContent = `Progression : ${pct}%`;
+}
 
-  requestAnimationFrame(loop);
-};
+function completeDepartment() {
+  const global = loadGlobal();
+  const dept = departments[state.deptIndex].num;
 
+  if (!global.completed.includes(dept))
+    global.completed.push(dept);
 
-function loop(timestamp) {
-  if (!running) return;
+  global.deptIndex++;
+  saveGlobal(global);
 
-  if (!startTime) startTime = timestamp;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  const currentElapsed = (timestamp - startTime) / 1000;
-  const timeLeft = Math.max(0, timerDuration - currentElapsed);
-  const percent = ((revealed / blocks.length) * 100).toFixed(1);
-  timerDiv.textContent = `Temps : ${timeLeft.toFixed(1)}s | Progression : ${percent}%`;
-
-  if (timeLeft <= 0 || revealed >= blocks.length) {
-    running = false;
-    totalElapsedTime += currentElapsed; // Accumuler le temps passé
-    saveProgress();
-    if (revealed >= blocks.length) {
-      timerDiv.textContent = `Terminé ! 100%`;
-      resetProgress();
-    } else {
-      timerDiv.textContent = `Temps écoulé | Progression : ${percent}%`;
-    }
+  if (global.deptIndex >= departments.length) {
+    
+    timerDiv.textContent = "Bravo";
     return;
   }
 
-  // Calculer la progression totale en incluant le temps accumulé précédemment
-  const totalTime = totalElapsedTime + currentElapsed;
-  const totalProgress = totalTime / animDuration;
-  const totalTargetCount = Math.floor(totalProgress * blocks.length);
+  loadDepartment();
+}
 
-  // Révéler les blocs manquants
-  while (revealed < totalTargetCount && revealed < blocks.length) {
-    const b = blocks[revealed];
-    ctx.drawImage(
-      img,
-      b.x, b.y, blockSize, blockSize,
-      b.x, b.y, blockSize, blockSize
-    );
-    revealed++;
+/* ===================== ANIMATION ===================== */
+
+function loop() {
+  if (!state.running) return;
+
+  // Utiliser performance.now() pour un temps réel précis
+  const now = performance.now();
+  const elapsed = (now - state.startTime) / 1000;
+  const timeLeft = Math.max(0, timerInput.value - elapsed);
+
+  timerDiv.textContent = `Temps : ${timeLeft.toFixed(0)}s`;
+
+  const total = state.totalTime + elapsed;
+  const target = Math.floor(
+    (total / animInput) * state.blocks.length
+  );
+
+  while (state.revealed < target && state.revealed < state.blocks.length) {
+    const b = state.blocks[state.revealed];
+    ctx.drawImage(state.img,b.x,b.y,1,1,b.x,b.y,1,1);
+    state.revealed++;
   }
 
-  requestAnimationFrame(loop);
+  updateUI();
+
+  if (state.revealed >= state.blocks.length) {
+    state.running = false;
+    clearInterval(state.intervalId);
+    son.play();
+    saveDept(departments[state.deptIndex].num);
+    setTimeout(completeDepartment, 1200);
+    return;
+  }
+
+  if (timeLeft <= 0) {
+    state.running = false;
+    clearInterval(state.intervalId);
+    state.totalTime += elapsed;
+    son.play();
+    saveDept(departments[state.deptIndex].num);
+    return;
+  }
 }
+
+/* ===================== EVENTS ===================== */
+
+startBtn.onclick = () => {
+  if (state.running) return;
+  state.startTime = performance.now();
+  state.running = true;
+  
+  // Utiliser setInterval au lieu de requestAnimationFrame
+  // setInterval continue de fonctionner en arrière-plan
+  state.intervalId = setInterval(loop, 16); // ~60fps
+};
+
+resetBtn.onclick = () => {
+  if (!confirm("Tout supprimer ?")) return;
+  localStorage.clear();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  loadDepartment();
+};
+
+/* ===================== INIT ===================== */
+
+loadDepartment();
 </script>
 
 </body>

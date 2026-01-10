@@ -15,6 +15,7 @@ body {
   gap:12px;
   padding:20px;
   font-size: 50px;
+  height: 95svh;
 }
 
 canvas {
@@ -98,7 +99,8 @@ const state = {
   running: false,
   startTime: null,
   blocks: [],
-  img: null
+  img: null,
+  intervalId: null
 };
 
 /* ===================== DOM ===================== */
@@ -118,7 +120,8 @@ const animInput = 3600;
 /* ===================== STORAGE ===================== */
 
 function loadGlobal() {
-  return JSON.parse(localStorage.getItem("global")) || {
+  const stored = localStorage.getItem("global");
+  return stored ? JSON.parse(stored) : {
     deptIndex: 0,
     completed: []
   };
@@ -129,7 +132,8 @@ function saveGlobal(data) {
 }
 
 function loadDept(num) {
-  return JSON.parse(localStorage.getItem("dept_" + num)) || null;
+  const stored = localStorage.getItem("dept_" + num);
+  return stored ? JSON.parse(stored) : null;
 }
 
 function saveDept(num) {
@@ -220,11 +224,12 @@ function completeDepartment() {
 
 /* ===================== ANIMATION ===================== */
 
-function loop(t) {
+function loop() {
   if (!state.running) return;
 
-  if (!state.startTime) state.startTime = t;
-  const elapsed = (t - state.startTime)/1000;
+  // Utiliser performance.now() pour un temps réel précis
+  const now = performance.now();
+  const elapsed = (now - state.startTime) / 1000;
   const timeLeft = Math.max(0, timerInput.value - elapsed);
 
   timerDiv.textContent = `Temps : ${timeLeft.toFixed(0)}s`;
@@ -244,6 +249,7 @@ function loop(t) {
 
   if (state.revealed >= state.blocks.length) {
     state.running = false;
+    clearInterval(state.intervalId);
     son.play();
     saveDept(departments[state.deptIndex].num);
     setTimeout(completeDepartment, 1200);
@@ -252,22 +258,24 @@ function loop(t) {
 
   if (timeLeft <= 0) {
     state.running = false;
+    clearInterval(state.intervalId);
     state.totalTime += elapsed;
     son.play();
     saveDept(departments[state.deptIndex].num);
     return;
   }
-
-  requestAnimationFrame(loop);
 }
 
 /* ===================== EVENTS ===================== */
 
 startBtn.onclick = () => {
   if (state.running) return;
-  state.startTime = null;
+  state.startTime = performance.now();
   state.running = true;
-  requestAnimationFrame(loop);
+  
+  // Utiliser setInterval au lieu de requestAnimationFrame
+  // setInterval continue de fonctionner en arrière-plan
+  state.intervalId = setInterval(loop, 16); // ~60fps
 };
 
 resetBtn.onclick = () => {
