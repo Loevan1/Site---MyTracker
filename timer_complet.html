@@ -17,11 +17,18 @@ body {
   font-size: 50px;
   height: 95svh;
 }
+a{
+  text-decoration: none;
+  color: black;
+}
 
+button, input{
+  border-radius: 30px;
+}
 canvas {
   background:#111;
   width: 900px;
-  border: 2px solid #222;
+  
   margin-bottom: 10px;
 }
 
@@ -53,6 +60,7 @@ margin: 40px; }
   display: flex;
   gap: 20px;
   font-size: 40px;
+  align-items: center;
 }
 </style>
 </head>
@@ -61,17 +69,19 @@ margin: 40px; }
 
 <div id="temps">
 <label>Timer : </label>
-  <input id="timerDuration" type="number" value="1800" min="1" step="1">
+  <input id="timerDuration" type="number" value="30" >
+  <span>min</span>
 </div>
 <div class="controls">
   
   
   <button id="start">Démarrer</button>
   <button id="reset">Reset total</button>
+  <button><a href="index.html">Accueil</a></button>
 </div>
 
 <div class="stats">
-  <div id="completedCount">Complétés : 0/101 </div>
+  
   <div id="progress">Progression : 0%</div>
   
 </div>
@@ -101,7 +111,6 @@ const state = {
   blocks: [],
   img: null,
   intervalId: null,
-  // Nouveau : sauvegarder le timestamp réel de démarrage
   realStartTimestamp: null
 };
 
@@ -111,12 +120,13 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const timerDiv = document.getElementById("timer");
 
-const completedDiv = document.getElementById("completedCount");
+
 const progressDiv = document.getElementById("progress");
 
 const startBtn = document.getElementById("start");
 const resetBtn = document.getElementById("reset");
 const timerInput = document.getElementById("timerDuration");
+
 const animInput = 3600;
 
 /* ===================== STORAGE ===================== */
@@ -145,14 +155,13 @@ function saveDept(num) {
   }));
 }
 
-// Sauvegarder l'état du timer en cours
 function saveTimerState() {
   if (state.running && state.realStartTimestamp) {
     localStorage.setItem("activeTimer", JSON.stringify({
       deptNum: departments[state.deptIndex].num,
       startTimestamp: state.realStartTimestamp,
       totalTime: state.totalTime,
-      timerDuration: parseInt(timerInput.value)
+      timerDuration: parseFloat(timerInput.value) * 60
     }));
   }
 }
@@ -206,7 +215,6 @@ function loadDepartment() {
 
     updateUI();
     
-    // Vérifier s'il y avait un timer en cours
     checkForActiveTimer();
   };
 }
@@ -221,22 +229,18 @@ function checkForActiveTimer() {
     return;
   }
   
-  // Calculer le temps réel écoulé depuis le démarrage
   const now = Date.now();
   const elapsedReal = (now - timerState.startTimestamp) / 1000;
   
-  // Restaurer l'état
   state.totalTime = timerState.totalTime;
-  timerInput.value = timerState.timerDuration;
+  timerInput.value = (timerState.timerDuration / 60).toFixed(0);
   
-  // Si le timer n'est pas encore terminé, le redémarrer
   if (elapsedReal < timerState.timerDuration) {
     state.realStartTimestamp = timerState.startTimestamp;
     state.startTime = performance.now() - (elapsedReal * 1000);
     state.running = true;
     state.intervalId = setInterval(loop, 16);
   } else {
-    // Le timer est terminé, afficher l'état final
     const total = state.totalTime + timerState.timerDuration;
     const target = Math.floor((total / animInput) * state.blocks.length);
     state.revealed = Math.min(target, state.blocks.length);
@@ -255,8 +259,7 @@ function redraw() {
 
 function updateUI() {
   const global = loadGlobal();
-  completedDiv.textContent =
-    `Complétés : ${global.completed.length}/101`;
+  
 
   const pct = ((state.revealed/state.blocks.length)*100||0).toFixed(1);
   progressDiv.textContent = `Progression : ${pct}%`;
@@ -289,12 +292,14 @@ function completeDepartment() {
 function loop() {
   if (!state.running) return;
 
-  // Calculer le temps basé sur le timestamp réel
   const now = Date.now();
   const elapsedReal = (now - state.realStartTimestamp) / 1000;
-  const timeLeft = Math.max(0, timerInput.value - elapsedReal);
+  const timerDurationSeconds = parseFloat(timerInput.value) * 60;
+  const timeLeft = Math.max(0, timerDurationSeconds - elapsedReal);
+  const tempsrestantmin = Math.floor(timeLeft / 60);
+  const tempsrestantsec = Math.floor(timeLeft % 60).toString().padStart(2, "0");
 
-  timerDiv.textContent = `Temps : ${timeLeft.toFixed(0)}s`;
+  timerDiv.textContent = `Temps : ${tempsrestantmin}m ${tempsrestantsec}s`;
 
   const total = state.totalTime + elapsedReal;
   const target = Math.floor(
@@ -354,19 +359,16 @@ resetBtn.onclick = () => {
   loadDepartment();
 };
 
-// Sauvegarder l'état régulièrement
 setInterval(() => {
   if (state.running) {
     saveTimerState();
   }
 }, 1000);
 
-// Gérer la visibilité de la page
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.running) {
     saveTimerState();
   } else if (!document.hidden && state.running) {
-    // Recalculer en cas de retour
     loop();
   }
 });
